@@ -1,0 +1,16 @@
+node_modules/
+client/node_modules/
+build/
+dist/
+client/dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+__pycache__/
+*.py[cod]
+*$py.class
+local_bug_classifier.joblib
+logs.db
+uploads/

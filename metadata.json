@@ -1,0 +1,5 @@
+{
+  "name": "NLP Log Processor & Bug Reporter",
+  "description": "An intelligent system that processes technical logs (.log, .txt, .csv, .pcap) using NLP to generate structured bug reports and priority insights.",
+  "requestFramePermissions": []
+}

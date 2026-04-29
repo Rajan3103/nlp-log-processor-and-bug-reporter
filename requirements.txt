@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+python-multipart
+google-generativeai
+pandas
+scikit-learn
+fpdf
+python-dotenv
+sqlalchemy
+joblib
+numpy
+flask-cors # For CORS if needed, but FastAPI has its own

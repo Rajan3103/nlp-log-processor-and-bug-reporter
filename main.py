@@ -1,9 +1,12 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, Form
+from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 import os
 import shutil
+import csv
+import io
 from database import init_db, get_reports, add_reports_bulk, delete_report, clear_all_reports, update_report_status, get_stats, get_training_data
 from nlp_engine import NLPEngine
 from exporter import BugReportExporter
@@ -91,13 +94,30 @@ async def remove_all_reports():
 async def stats():
     return get_stats()
 
-@app.post("/api/train")
-async def train():
-    data = get_training_data()
-    success, msg = engine.train_local_model(data)
-    if not success:
-        raise HTTPException(status_code=400, detail=msg)
-    return {"message": msg}
+@app.get("/api/export/excel")
+async def export_excel():
+    reports = get_reports()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["ID", "Priority", "Category", "Issue Description", "Source File", "Timestamp", "Solution", "Verified"])
+    
+    for r in reports:
+        writer.writerow([
+            r['id'], 
+            r['priority'], 
+            r['category'], 
+            r['description'], 
+            r['source_file'], 
+            r['timestamp'], 
+            r.get('solution', ''),
+            'Yes' if r.get('verified') else 'No'
+        ])
+    
+    return Response(
+        content=output.getvalue(), 
+        media_type="text/csv", 
+        headers={"Content-Disposition": 'attachment; filename="registry_export.csv"'}
+    )
 
 if __name__ == "__main__":
     import uvicorn

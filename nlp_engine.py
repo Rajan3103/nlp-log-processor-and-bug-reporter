@@ -102,7 +102,8 @@ class NLPEngine:
               "description": "Human-readable bug description",
               "category": "Network Error" | "Performance Issue" | "Security Alert" | "System Failure" | "Application Bug",
               "priority": "Low" | "Medium" | "High" | "Critical",
-              "source_file": "{file_name}"
+              "source_file": "{file_name}",
+              "solution": "A detailed step-by-step recommendation to solve or fix this error"
             }}
           ]
         }}

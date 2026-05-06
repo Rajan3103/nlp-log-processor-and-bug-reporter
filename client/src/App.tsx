@@ -44,6 +44,7 @@ interface BugReport {
   priority: string;
   source_file: string;
   raw_content?: string;
+  solution?: string;
   timestamp: string;
   status: string;
   verified: boolean;
@@ -72,11 +73,12 @@ const CATEGORY_ICONS: Record<string, React.ReactNode> = {
 };
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'reports' | 'upload' | 'training'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'reports' | 'upload' | 'documentation'>('dashboard');
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successDialog, setSuccessDialog] = useState<boolean>(false);
+  const [isLiveMode, setIsLiveMode] = useState<boolean>(false);
   const [reports, setReports] = useState<BugReport[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -89,6 +91,17 @@ export default function App() {
     fetchStats();
     checkBackend();
   }, []);
+
+  useEffect(() => {
+    let interval: any;
+    if (isLiveMode) {
+      interval = setInterval(() => {
+        fetchReports();
+        fetchStats();
+      }, 5000);
+    }
+    return () => clearInterval(interval);
+  }, [isLiveMode]);
 
   const checkBackend = async () => {
     try {
@@ -213,8 +226,8 @@ export default function App() {
           <button onClick={() => setActiveTab('upload')} className={`sidebar-item ${activeTab === 'upload' ? 'active' : ''}`}>
             <Upload className="w-5 h-5" /> Processor
           </button>
-          <button onClick={() => setActiveTab('training')} className={`sidebar-item ${activeTab === 'training' ? 'active' : ''}`}>
-            <Activity className="w-5 h-5" /> Training
+          <button onClick={() => setActiveTab('documentation')} className={`sidebar-item ${activeTab === 'documentation' ? 'active' : ''}`}>
+            <FileText className="w-5 h-5" /> Documentation
           </button>
         </nav>
 
@@ -254,8 +267,16 @@ export default function App() {
                   <button onClick={clearAll} className="px-6 py-3 rounded-2xl bg-white/5 hover:bg-white/10 text-zinc-400 font-bold transition-all flex items-center gap-2">
                     <Trash2 className="w-4 h-4" /> Reset Data
                   </button>
-                  <button className="px-6 py-3 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-bold transition-all flex items-center gap-2 shadow-lg shadow-indigo-500/20">
-                    <Activity className="w-4 h-4" /> Live Feed
+                  <button 
+                    onClick={() => setIsLiveMode(!isLiveMode)}
+                    className={`px-6 py-3 rounded-2xl font-bold transition-all flex items-center gap-2 shadow-lg ${
+                      isLiveMode 
+                        ? 'bg-emerald-500 text-white shadow-emerald-500/20 animate-pulse' 
+                        : 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-indigo-500/20 hover:scale-105'
+                    }`}
+                  >
+                    <Activity className={`w-4 h-4 ${isLiveMode ? 'animate-spin-slow' : ''}`} /> 
+                    {isLiveMode ? 'Live Mode Active' : 'Live Feed'}
                   </button>
                 </div>
               </header>
@@ -329,7 +350,12 @@ export default function App() {
                         <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" vertical={false} />
                         <XAxis dataKey="priority" stroke="#71717a" fontSize={12} tickLine={false} axisLine={false} />
                         <YAxis stroke="#71717a" fontSize={12} tickLine={false} axisLine={false} />
-                        <Tooltip cursor={{ fill: '#ffffff05' }} contentStyle={{ backgroundColor: '#09090b', border: '1px solid #ffffff10', borderRadius: '16px' }} />
+                        <Tooltip 
+                          cursor={{ fill: '#ffffff05' }} 
+                          contentStyle={{ backgroundColor: '#09090b', border: '1px solid #ffffff10', borderRadius: '16px' }}
+                          itemStyle={{ color: '#fff', fontWeight: 'bold' }}
+                          labelStyle={{ color: '#71717a', marginBottom: '4px' }}
+                        />
                         <Bar dataKey="count" radius={[8, 8, 8, 8]} barSize={32}>
                           {stats?.priorityStats.map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={`url(#color${entry.priority})`} />
@@ -349,7 +375,10 @@ export default function App() {
                             <Cell key={`cell-${index}`} fill={['#6366f1', '#a855f7', '#ec4899', '#06b6d4', '#3b82f6'][index % 5]} />
                           ))}
                         </Pie>
-                        <Tooltip contentStyle={{ backgroundColor: '#09090b', border: '1px solid #ffffff10', borderRadius: '16px' }} />
+                        <Tooltip 
+                          contentStyle={{ backgroundColor: '#09090b', border: '1px solid #ffffff10', borderRadius: '16px' }} 
+                          itemStyle={{ color: '#fff', fontWeight: 'bold' }}
+                        />
                       </PieChart>
                     </ResponsiveContainer>
                     <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
@@ -387,7 +416,13 @@ export default function App() {
                         <div className="flex-1" />
                         <span className="text-[10px] font-bold text-zinc-600 tracking-widest">{new Date(report.timestamp).toLocaleTimeString('en-US', {hour12: false, hour: '2-digit', minute:'2-digit', second:'2-digit'})}</span>
                       </div>
-                      <h4 className="text-xl md:text-2xl font-bold mb-6 text-white/90 leading-snug max-w-4xl">{report.description}</h4>
+                      <h4 className="text-xl md:text-2xl font-bold mb-4 text-white/90 leading-snug max-w-4xl">{report.description}</h4>
+                      {report.solution && (
+                        <div className="bg-indigo-500/5 border border-indigo-500/10 rounded-xl p-4 mb-6">
+                          <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2"><Sparkles className="w-3 h-3"/> Recommended Solution</p>
+                          <p className="text-sm font-medium text-indigo-100/70 leading-relaxed">{report.solution}</p>
+                        </div>
+                      )}
                       <div className="flex flex-wrap items-center gap-4 text-xs font-bold text-zinc-500">
                         <span className="flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-md border border-white/5"><FileText className="w-3 h-3 text-indigo-500" /> {report.source_file}</span>
                         <span className="w-1 h-1 rounded-full bg-zinc-700" />
@@ -473,28 +508,71 @@ export default function App() {
             </div>
           )}
 
-          {activeTab === 'training' && (
+          {activeTab === 'documentation' && (
             <div className="space-y-12 animate-in fade-in duration-700">
                <header>
-                <h2 className="text-5xl font-extrabold tracking-tight">Training <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-500">Center</span></h2>
-                <p className="text-zinc-500 mt-3 text-lg font-medium">Optimize local neural vectors using verified datasets.</p>
+                <h2 className="text-5xl font-extrabold tracking-tight">System <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-500">Documentation</span></h2>
+                <p className="text-zinc-500 mt-3 text-lg font-medium">Access system guides and export audit data for external reporting.</p>
               </header>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="glass-card p-12 text-center">
-                  <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-4">Verified Data</p>
-                  <p className="text-7xl font-black">{reports.filter(r => r.verified).length}</p>
-                  <p className="text-xs font-bold text-zinc-600 mt-4 uppercase tracking-widest">Ready for local training</p>
-                </div>
-                <div className="glass-card p-12 flex flex-col items-center justify-center">
+                <div className="glass-card p-10">
+                  <div className="flex items-center gap-4 mb-6">
+                    <div className="p-3 rounded-2xl bg-indigo-500/10 text-indigo-400">
+                      <LayoutDashboard className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold">Data Export</h3>
+                      <p className="text-sm text-zinc-500">Generate external audit reports</p>
+                    </div>
+                  </div>
+                  <p className="text-zinc-400 text-sm mb-8 leading-relaxed">
+                    Download the entire bug registry in Excel-compatible CSV format. This report includes issue descriptions, priorities, categories, and AI-generated solutions.
+                  </p>
                   <button 
                     onClick={async () => {
-                      try { await axios.post(`${API_BASE}/train`); alert('Model Trained!'); } catch(e:any) { alert(e.response.data.detail); }
-                    }} 
-                    className="btn-primary w-full"
+                      try {
+                        const res = await axios.get(`${API_BASE}/export/excel`, { responseType: 'blob' });
+                        const url = window.URL.createObjectURL(new Blob([res.data]));
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.setAttribute('download', 'registry_export.csv');
+                        document.body.appendChild(link);
+                        link.click();
+                        link.remove();
+                      } catch (err) {
+                        setError('Export failed. Please ensure the backend is running.');
+                      }
+                    }}
+                    className="btn-primary w-full flex items-center justify-center gap-2 py-4"
                   >
-                    Initialize Neural Training
+                    <FileText className="w-5 h-5" /> Export Registry to Excel
                   </button>
-                  <p className="text-xs font-bold text-zinc-600 mt-6 uppercase tracking-widest text-center">Minimum 5 verified reports required</p>
+                </div>
+
+                <div className="glass-card p-10">
+                  <div className="flex items-center gap-4 mb-6">
+                    <div className="p-3 rounded-2xl bg-purple-500/10 text-purple-400">
+                      <HelpCircle className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold">System Guide</h3>
+                      <p className="text-sm text-zinc-500">How to use NexLog Pipeline</p>
+                    </div>
+                  </div>
+                  <ul className="space-y-4 text-sm text-zinc-400">
+                    <li className="flex items-start gap-3">
+                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-1.5" />
+                      <span>Upload logs in the <b>Processor</b> tab to begin analysis.</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-1.5" />
+                      <span>Review identified bugs and solutions in the <b>Registry</b>.</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-1.5" />
+                      <span>Monitor system health and trends via <b>Analytics</b>.</span>
+                    </li>
+                  </ul>
                 </div>
               </div>
             </div>

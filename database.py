@@ -17,25 +17,28 @@ def init_db():
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
             raw_content TEXT,
             status TEXT DEFAULT 'Open',
-            verified INTEGER DEFAULT 0
+            verified INTEGER DEFAULT 0,
+            solution TEXT
         )
     """)
-    # Check for verified column (migration)
+    # Check for columns (migration)
     cursor.execute("PRAGMA table_info(bug_reports)")
     columns = [col[1] for col in cursor.fetchall()]
     if 'verified' not in columns:
         cursor.execute("ALTER TABLE bug_reports ADD COLUMN verified INTEGER DEFAULT 0")
+    if 'solution' not in columns:
+        cursor.execute("ALTER TABLE bug_reports ADD COLUMN solution TEXT")
     
     conn.commit()
     conn.close()
 
-def add_report(description, category, priority, source_file, raw_content, status='Open'):
+def add_report(description, category, priority, source_file, raw_content, status='Open', solution=None):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("""
-        INSERT INTO bug_reports (description, category, priority, source_file, raw_content, status)
-        VALUES (?, ?, ?, ?, ?, ?)
-    """, (description, category, priority, source_file, raw_content, status))
+        INSERT INTO bug_reports (description, category, priority, source_file, raw_content, status, solution)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (description, category, priority, source_file, raw_content, status, solution))
     report_id = cursor.lastrowid
     conn.commit()
     conn.close()
@@ -45,9 +48,9 @@ def add_reports_bulk(reports):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.executemany("""
-        INSERT INTO bug_reports (description, category, priority, source_file, raw_content, status)
-        VALUES (?, ?, ?, ?, ?, ?)
-    """, [(r['description'], r['category'], r['priority'], r['source_file'], r.get('raw_content', ''), r.get('status', 'Open')) for r in reports])
+        INSERT INTO bug_reports (description, category, priority, source_file, raw_content, status, solution)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, [(r['description'], r['category'], r['priority'], r['source_file'], r.get('raw_content', ''), r.get('status', 'Open'), r.get('solution', '')) for r in reports])
     conn.commit()
     conn.close()
 

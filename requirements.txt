@@ -10,3 +10,5 @@ sqlalchemy
 joblib
 numpy
 flask-cors # For CORS if needed, but FastAPI has its own
+groq
+requests

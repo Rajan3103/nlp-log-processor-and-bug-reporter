@@ -17,7 +17,9 @@ import {
   Sparkles,
   HelpCircle,
   LogOut,
-  Activity
+  Activity,
+  ShieldCheck,
+  CheckCircle2
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -41,6 +43,7 @@ interface BugReport {
   category: string;
   priority: string;
   source_file: string;
+  raw_content?: string;
   timestamp: string;
   status: string;
   verified: boolean;
@@ -56,6 +59,7 @@ const PRIORITY_COLORS: Record<string, string> = {
   High: '#f97316',
   Medium: '#f59e0b',
   Low: '#10b981',
+  Safe: '#3b82f6',
 };
 
 const CATEGORY_ICONS: Record<string, React.ReactNode> = {
@@ -64,6 +68,7 @@ const CATEGORY_ICONS: Record<string, React.ReactNode> = {
   'Security Alert': <ShieldAlert className="w-5 h-5" />,
   'System Failure': <AlertCircle className="w-5 h-5" />,
   'Application Bug': <Bug className="w-5 h-5" />,
+  'Safe File': <ShieldCheck className="w-5 h-5" />,
 };
 
 export default function App() {
@@ -71,9 +76,11 @@ export default function App() {
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successDialog, setSuccessDialog] = useState<boolean>(false);
   const [reports, setReports] = useState<BugReport[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedEngine, setSelectedEngine] = useState<'auto' | 'groq' | 'gemini' | 'ollama'>('auto');
   const [backendStatus, setBackendStatus] = useState<'checking' | 'online' | 'offline'>('checking');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -116,6 +123,7 @@ export default function App() {
     setIsUploading(true);
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('engine_type', selectedEngine);
     setError(null);
 
     try {
@@ -127,6 +135,8 @@ export default function App() {
           ...r,
           raw_content: data.content
         })));
+      } else {
+        setSuccessDialog(true);
       }
 
       await fetchReports();
@@ -240,27 +250,51 @@ export default function App() {
                   <h2 className="text-5xl font-extrabold tracking-tight">System <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-500">Intelligence</span></h2>
                   <p className="text-zinc-500 mt-3 text-lg font-medium">Monitoring and classification of complex vector logs.</p>
                 </div>
-                <button onClick={clearAll} className="px-6 py-3 rounded-2xl bg-white/5 hover:bg-red-500/10 hover:text-red-500 text-zinc-400 font-bold transition-all flex items-center gap-2">
-                  <Trash2 className="w-4 h-4" /> Reset Data
-                </button>
+                <div className="flex gap-4">
+                  <button onClick={clearAll} className="px-6 py-3 rounded-2xl bg-white/5 hover:bg-white/10 text-zinc-400 font-bold transition-all flex items-center gap-2">
+                    <Trash2 className="w-4 h-4" /> Reset Data
+                  </button>
+                  <button className="px-6 py-3 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-bold transition-all flex items-center gap-2 shadow-lg shadow-indigo-500/20">
+                    <Activity className="w-4 h-4" /> Live Feed
+                  </button>
+                </div>
               </header>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div className="glass-card p-8">
-                  <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-4">Total Reports</p>
-                  <p className="text-5xl font-black">{reports.length}</p>
+                <div className="glass-card p-8 flex flex-col justify-between">
+                  <div className="flex justify-between items-start mb-4">
+                    <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">Active Issues</p>
+                    <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400"><Bug className="w-4 h-4" /></div>
+                  </div>
+                  <p className="text-6xl font-black mb-4">{reports.length}</p>
+                  <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Synchronized</p>
                 </div>
-                <div className="glass-card p-8">
-                  <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-4">Critical</p>
-                  <p className="text-5xl font-black text-red-500">{reports.filter(r => r.priority === 'Critical').length}</p>
+                
+                <div className="glass-card p-8 flex flex-col justify-between">
+                  <div className="flex justify-between items-start mb-4">
+                    <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">Critical State</p>
+                    <div className="p-2 rounded-xl bg-red-500/10 text-red-500"><AlertCircle className="w-4 h-4" /></div>
+                  </div>
+                  <p className="text-6xl font-black text-red-500 mb-4">{reports.filter(r => r.priority === 'Critical').length}</p>
+                  <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest flex items-center gap-2">Action Required</p>
                 </div>
-                <div className="glass-card p-8">
-                  <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-4">Verified</p>
-                  <p className="text-5xl font-black text-emerald-500">{reports.filter(r => r.verified).length}</p>
+
+                <div className="glass-card p-8 flex flex-col justify-between">
+                  <div className="flex justify-between items-start mb-4">
+                    <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">Sources</p>
+                    <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400"><Network className="w-4 h-4" /></div>
+                  </div>
+                  <p className="text-6xl font-black mb-4">{new Set(reports.map(r => r.source_file)).size}</p>
+                  <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest flex items-center gap-2">Unique Vectors</p>
                 </div>
-                <div className="glass-card p-8">
-                  <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-4">Sources</p>
-                  <p className="text-5xl font-black text-indigo-400">{new Set(reports.map(r => r.source_file)).size}</p>
+
+                <div className="glass-card p-8 flex flex-col justify-between">
+                  <div className="flex justify-between items-start mb-4">
+                    <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">Analysis Time</p>
+                    <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400"><Zap className="w-4 h-4" /></div>
+                  </div>
+                  <p className="text-6xl font-black text-indigo-400 mb-4">0.8s</p>
+                  <p className="text-[10px] font-bold text-purple-400 uppercase tracking-widest flex items-center gap-2">Real-Time Pipeline</p>
                 </div>
               </div>
 
@@ -269,14 +303,36 @@ export default function App() {
                   <h3 className="text-xl font-bold mb-8 flex items-center gap-3"><BarChart3 className="w-6 h-6 text-indigo-400" /> Priority Map</h3>
                   <div className="h-80">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={stats?.priorityStats || []}>
+                      <BarChart data={stats?.priorityStats || []} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="colorCritical" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#ef4444" stopOpacity={1}/>
+                            <stop offset="95%" stopColor="#991b1b" stopOpacity={1}/>
+                          </linearGradient>
+                          <linearGradient id="colorHigh" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#f97316" stopOpacity={1}/>
+                            <stop offset="95%" stopColor="#c2410c" stopOpacity={1}/>
+                          </linearGradient>
+                          <linearGradient id="colorMedium" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#eab308" stopOpacity={1}/>
+                            <stop offset="95%" stopColor="#a16207" stopOpacity={1}/>
+                          </linearGradient>
+                          <linearGradient id="colorLow" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#10b981" stopOpacity={1}/>
+                            <stop offset="95%" stopColor="#047857" stopOpacity={1}/>
+                          </linearGradient>
+                          <linearGradient id="colorSafe" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={1}/>
+                            <stop offset="95%" stopColor="#1d4ed8" stopOpacity={1}/>
+                          </linearGradient>
+                        </defs>
                         <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" vertical={false} />
                         <XAxis dataKey="priority" stroke="#71717a" fontSize={12} tickLine={false} axisLine={false} />
                         <YAxis stroke="#71717a" fontSize={12} tickLine={false} axisLine={false} />
                         <Tooltip cursor={{ fill: '#ffffff05' }} contentStyle={{ backgroundColor: '#09090b', border: '1px solid #ffffff10', borderRadius: '16px' }} />
-                        <Bar dataKey="count" radius={[8, 8, 8, 8]} barSize={40}>
+                        <Bar dataKey="count" radius={[8, 8, 8, 8]} barSize={32}>
                           {stats?.priorityStats.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={PRIORITY_COLORS[entry.priority] || '#6366f1'} />
+                            <Cell key={`cell-${index}`} fill={`url(#color${entry.priority})`} />
                           ))}
                         </Bar>
                       </BarChart>
@@ -285,17 +341,21 @@ export default function App() {
                 </div>
                 <div className="glass-card p-10">
                   <h3 className="text-xl font-bold mb-8 flex items-center gap-3"><Network className="w-6 h-6 text-purple-400" /> Category Mix</h3>
-                  <div className="h-64">
+                  <div className="h-64 relative">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
-                        <Pie data={stats?.categoryStats || []} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={8} dataKey="count" nameKey="category" stroke="none">
+                        <Pie data={stats?.categoryStats || []} cx="50%" cy="50%" innerRadius={70} outerRadius={90} paddingAngle={8} dataKey="count" nameKey="category" stroke="none">
                           {stats?.categoryStats.map((_, index) => (
-                            <Cell key={`cell-${index}`} fill={['#6366f1', '#a855f7', '#ec4899', '#06b6d4'][index % 4]} />
+                            <Cell key={`cell-${index}`} fill={['#6366f1', '#a855f7', '#ec4899', '#06b6d4', '#3b82f6'][index % 5]} />
                           ))}
                         </Pie>
                         <Tooltip contentStyle={{ backgroundColor: '#09090b', border: '1px solid #ffffff10', borderRadius: '16px' }} />
                       </PieChart>
                     </ResponsiveContainer>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                      <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Balance</p>
+                      <p className="text-3xl font-black text-white">{reports.length}</p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -307,34 +367,39 @@ export default function App() {
               <header className="flex flex-col md:flex-row md:items-center justify-between gap-8">
                 <div>
                   <h2 className="text-5xl font-extrabold tracking-tight">Issue <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-500">Registry</span></h2>
+                  <p className="text-zinc-500 mt-3 text-lg font-medium">Verified audit logs with AI-enhanced classification.</p>
                 </div>
                 <div className="relative w-full md:w-96">
-                  <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-indigo-500" />
-                  <input type="text" placeholder="Scan registry..." className="bg-white/5 border border-white/5 rounded-3xl pl-14 pr-6 py-5 w-full focus:outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                  <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-500" />
+                  <input type="text" placeholder="Scan registry..." className="bg-[#121216] border border-white/5 rounded-2xl pl-12 pr-6 py-4 w-full focus:outline-none focus:ring-1 focus:ring-indigo-500/30 transition-all text-sm font-medium" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                 </div>
               </header>
 
               <div className="grid gap-4">
                 {filteredReports.map((report) => (
-                  <div key={report.id} className="glass-card p-8 group transition-all hover:bg-white/[0.05]">
-                    <div className="flex flex-col md:flex-row gap-8">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-4 mb-4">
-                          <span className="px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border" style={{ borderColor: `${PRIORITY_COLORS[report.priority]}40`, backgroundColor: `${PRIORITY_COLORS[report.priority]}10`, color: PRIORITY_COLORS[report.priority] }}>{report.priority}</span>
-                          <span className="text-xs font-bold text-zinc-400 bg-white/5 px-4 py-1 rounded-full flex items-center gap-2">
-                            {CATEGORY_ICONS[report.category]} {report.category}
-                          </span>
-                          {report.verified && <span className="px-4 py-1 rounded-full text-[10px] font-black bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">VERIFIED</span>}
-                          <div className="flex-1 h-px bg-white/5" />
-                          <span className="text-[10px] font-bold text-zinc-600">{new Date(report.timestamp).toLocaleTimeString()}</span>
-                        </div>
-                        <h4 className="text-2xl font-bold mb-6">{report.description}</h4>
-                        <p className="text-xs font-bold text-zinc-500">📁 {report.source_file} | ID: {report.id.toString().padStart(4, '0')}</p>
+                  <div key={report.id} className="relative bg-[#0f0f13] border border-white/5 rounded-3xl p-6 group transition-all hover:bg-[#121216] hover:border-white/10 flex flex-col md:flex-row gap-6">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-4 mb-4">
+                        <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border" style={{ borderColor: `${PRIORITY_COLORS[report.priority]}40`, backgroundColor: `${PRIORITY_COLORS[report.priority]}10`, color: PRIORITY_COLORS[report.priority] }}>{report.priority}</span>
+                        <span className="text-xs font-bold text-zinc-400 bg-[#15151a] px-3 py-1 rounded-full flex items-center gap-2 border border-white/5">
+                          {CATEGORY_ICONS[report.category]} {report.category}
+                        </span>
+                        <div className="flex-1" />
+                        <span className="text-[10px] font-bold text-zinc-600 tracking-widest">{new Date(report.timestamp).toLocaleTimeString('en-US', {hour12: false, hour: '2-digit', minute:'2-digit', second:'2-digit'})}</span>
                       </div>
-                      <div className="flex flex-col gap-2 border-l border-white/5 pl-8">
-                        <button onClick={() => verifyReport(report.id)} className="p-4 bg-white/5 hover:bg-emerald-500/20 hover:text-emerald-500 rounded-2xl transition-all"><Zap className="w-6 h-6" /></button>
-                        <button onClick={() => deleteReport(report.id)} className="p-4 bg-white/5 hover:bg-red-500/20 hover:text-red-500 rounded-2xl transition-all"><Trash2 className="w-6 h-6" /></button>
+                      <h4 className="text-xl md:text-2xl font-bold mb-6 text-white/90 leading-snug max-w-4xl">{report.description}</h4>
+                      <div className="flex flex-wrap items-center gap-4 text-xs font-bold text-zinc-500">
+                        <span className="flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-md border border-white/5"><FileText className="w-3 h-3 text-indigo-500" /> {report.source_file}</span>
+                        <span className="w-1 h-1 rounded-full bg-zinc-700" />
+                        <span>ID: {report.id.toString().padStart(4, '0')}</span>
                       </div>
+                    </div>
+                    <div className="flex flex-col items-center justify-start gap-3 border-l border-white/5 pl-6">
+                      <div className="flex gap-2">
+                        <button onClick={() => deleteReport(report.id)} className="w-10 h-10 flex items-center justify-center bg-white/5 hover:bg-red-500/20 hover:text-red-500 rounded-xl transition-all border border-white/5 text-zinc-500"><Trash2 className="w-4 h-4" /></button>
+                        <button onClick={() => verifyReport(report.id)} className="w-10 h-10 flex items-center justify-center bg-white/5 hover:bg-indigo-500/20 hover:text-indigo-400 rounded-xl transition-all border border-white/5 text-zinc-500"><ChevronRight className="w-4 h-4" /></button>
+                      </div>
+                      {report.verified && <span className="mt-auto absolute bottom-8 right-8 text-[9px] font-black tracking-[0.2em] text-indigo-500">VERIFIED</span>}
                     </div>
                   </div>
                 ))}
@@ -350,9 +415,48 @@ export default function App() {
                 </div>
                 <h2 className="text-7xl font-black tracking-tighter mb-4">Pipeline <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-500">Inbound</span></h2>
                 <p className="text-zinc-500 text-xl font-medium">Transmit log data for deep architectural analysis.</p>
+                
+                <div className="flex flex-wrap justify-center gap-4 mt-8">
+                  {[
+                    { id: 'auto', label: 'Auto Detect', icon: <Sparkles className="w-4 h-4" /> },
+                    { id: 'groq', label: 'Groq (Llama-3)', icon: <Zap className="w-4 h-4" /> },
+                    { id: 'gemini', label: 'Gemini 1.5', icon: <Activity className="w-4 h-4" /> },
+                    { id: 'ollama', label: 'Local (Ollama)', icon: <LayoutDashboard className="w-4 h-4" /> },
+                  ].map((engine) => (
+                    <button
+                      key={engine.id}
+                      onClick={() => setSelectedEngine(engine.id as any)}
+                      className={`px-6 py-3 rounded-2xl border transition-all flex items-center gap-2 font-bold text-sm ${
+                        selectedEngine === engine.id 
+                        ? 'bg-indigo-500 border-indigo-400 text-white shadow-lg shadow-indigo-500/20' 
+                        : 'bg-white/5 border-white/5 text-zinc-400 hover:bg-white/10'
+                      }`}
+                    >
+                      {engine.icon} {engine.label}
+                    </button>
+                  ))}
+                </div>
               </header>
 
               {error && <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-6 rounded-3xl flex items-center gap-4">{error}</div>}
+
+              {successDialog && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+                  <div className="bg-[#0a0a0e] border border-emerald-500/30 rounded-3xl p-8 max-w-md w-full shadow-[0_0_40px_rgba(16,185,129,0.15)] transform animate-in zoom-in-95 duration-300">
+                    <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                      <CheckCircle2 className="w-8 h-8 text-emerald-500" />
+                    </div>
+                    <h3 className="text-2xl font-black text-center mb-2">File is Safe</h3>
+                    <p className="text-zinc-400 text-center mb-8">The AI analyzed the log file and found no critical errors or alerts. Your file has been logged in the registry.</p>
+                    <button 
+                      onClick={() => setSuccessDialog(false)}
+                      className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-2xl transition-all"
+                    >
+                      Acknowledge
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div onClick={() => fileInputRef.current?.click()} className={`glass-card p-24 cursor-pointer transition-all ${file ? 'border-indigo-500/40 bg-indigo-500/5' : 'hover:bg-white/5'}`}>
                 <input type="file" ref={fileInputRef} className="hidden" onChange={(e) => setFile(e.target.files?.[0] || null)} />

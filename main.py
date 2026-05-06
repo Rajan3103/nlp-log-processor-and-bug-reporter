@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
@@ -35,7 +35,7 @@ async def health():
     return {"status": "online", "engine": "ready" if engine.has_gemini else "offline"}
 
 @app.post("/api/upload")
-async def upload_file(file: UploadFile = File(...)):
+async def upload_file(file: UploadFile = File(...), engine_type: str = Form("auto")):
     temp_path = f"uploads/{file.filename}"
     os.makedirs("uploads", exist_ok=True)
     
@@ -47,7 +47,7 @@ async def upload_file(file: UploadFile = File(...)):
             content_bytes = f.read()
         
         content = engine.process_file_content(content_bytes, file.filename)
-        reports = engine.analyze_with_gemini(content, file.filename)
+        reports = engine.analyze(content, file.filename, engine=engine_type)
         
         # Cleanup
         os.remove(temp_path)

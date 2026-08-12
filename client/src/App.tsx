@@ -16,10 +16,16 @@ import {
   Trash2,
   Sparkles,
   HelpCircle,
-  LogOut,
   Activity,
   ShieldCheck,
-  CheckCircle2
+  CheckCircle2,
+  Github,
+  Send,
+  Settings,
+  Database,
+  ExternalLink,
+  X,
+  Bell
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -48,11 +54,18 @@ interface BugReport {
   timestamp: string;
   status: string;
   verified: boolean;
+  github_issue_url?: string;
 }
 
 interface Stats {
   priorityStats: { priority: string; count: number }[];
   categoryStats: { category: string; count: number }[];
+}
+
+interface DbInfo {
+  engine: string;
+  is_postgresql: boolean;
+  has_psycopg2: boolean;
 }
 
 const PRIORITY_COLORS: Record<string, string> = {
@@ -81,15 +94,27 @@ export default function App() {
   const [isLiveMode, setIsLiveMode] = useState<boolean>(false);
   const [reports, setReports] = useState<BugReport[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
+  const [dbInfo, setDbInfo] = useState<DbInfo | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedEngine, setSelectedEngine] = useState<'auto' | 'groq' | 'gemini' | 'ollama'>('auto');
   const [backendStatus, setBackendStatus] = useState<'checking' | 'online' | 'offline'>('checking');
+  
+  // Settings & Integrations state
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [githubToken, setGithubToken] = useState(() => localStorage.getItem('gh_token') || '');
+  const [githubRepo, setGithubRepo] = useState(() => localStorage.getItem('gh_repo') || '');
+  const [discordWebhook, setDiscordWebhook] = useState(() => localStorage.getItem('discord_url') || '');
+  const [slackWebhook, setSlackWebhook] = useState(() => localStorage.getItem('slack_url') || '');
+  const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchReports();
     fetchStats();
     checkBackend();
+    fetchDbStatus();
   }, []);
 
   useEffect(() => {
@@ -103,13 +128,46 @@ export default function App() {
     return () => clearInterval(interval);
   }, [isLiveMode]);
 
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 4000);
+  };
+
+  const saveSettings = () => {
+    localStorage.setItem('gh_token', githubToken);
+    localStorage.setItem('gh_repo', githubRepo);
+    localStorage.setItem('discord_url', discordWebhook);
+    localStorage.setItem('slack_url', slackWebhook);
+    setShowSettingsModal(false);
+    showToast('Integration settings saved successfully!');
+  };
+
   const checkBackend = async () => {
     try {
       const res = await axios.get(`${API_BASE}/health`);
-      if (res.status === 200) setBackendStatus('online');
-      else setBackendStatus('offline');
+      if (res.status === 200) {
+        setBackendStatus('online');
+        if (res.data.database) {
+          setDbInfo({
+            engine: res.data.database,
+            is_postgresql: res.data.is_postgresql,
+            has_psycopg2: true
+          });
+        }
+      } else {
+        setBackendStatus('offline');
+      }
     } catch (e) {
       setBackendStatus('offline');
+    }
+  };
+
+  const fetchDbStatus = async () => {
+    try {
+      const res = await axios.get(`${API_BASE}/db/status`);
+      setDbInfo(res.data);
+    } catch (e) {
+      console.error('Failed to fetch DB status');
     }
   };
 
@@ -158,8 +216,42 @@ export default function App() {
       setFile(null);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Upload failed');
-    } finally {
+    } fontally {
       setIsUploading(false);
+    }
+  };
+
+  const createGithubIssue = async (reportId: number) => {
+    setActionLoading(prev => ({ ...prev, [`gh_${reportId}`]: true }));
+    try {
+      const res = await axios.post(`${API_BASE}/reports/${reportId}/github-issue`, {
+        github_token: githubToken || undefined,
+        repo: githubRepo || undefined
+      });
+      showToast(`GitHub Issue created: ${res.data.issue_url}`);
+      fetchReports();
+    } catch (e: any) {
+      const msg = e.response?.data?.detail || 'Failed to create GitHub Issue. Check your GitHub Token and Repo.';
+      alert(`GitHub Error: ${msg}`);
+    } finally {
+      setActionLoading(prev => ({ ...prev, [`gh_${reportId}`]: false }));
+    }
+  };
+
+  const sendWebhookAlert = async (reportId: number, platform: 'discord' | 'slack') => {
+    setActionLoading(prev => ({ ...prev, [`wh_${reportId}_${platform}`]: true }));
+    const webhookUrl = platform === 'discord' ? discordWebhook : slackWebhook;
+    try {
+      await axios.post(`${API_BASE}/reports/${reportId}/webhook`, {
+        webhook_url: webhookUrl || undefined,
+        platform
+      });
+      showToast(`Alert sent successfully to ${platform === 'discord' ? 'Discord' : 'Slack'}!`);
+    } catch (e: any) {
+      const msg = e.response?.data?.detail || `Failed to send ${platform} alert. Check your webhook URL.`;
+      alert(`Webhook Error: ${msg}`);
+    } finally {
+      setActionLoading(prev => ({ ...prev, [`wh_${reportId}_${platform}`]: false }));
     }
   };
 
@@ -201,11 +293,19 @@ export default function App() {
   );
 
   return (
-    <div className="min-h-screen flex selection:bg-indigo-500/30">
+    <div className="min-h-screen flex selection:bg-indigo-500/30 text-white">
       <div className="bg-mesh" />
 
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 bg-indigo-600 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 border border-indigo-400/30 animate-in fade-in slide-in-from-bottom-5">
+          <Sparkles className="w-5 h-5" />
+          <span className="text-sm font-bold">{toastMessage}</span>
+        </div>
+      )}
+
       {/* Sidebar */}
-      <aside className="fixed inset-y-0 left-0 w-80 bg-black/40 backdrop-blur-3xl border-r border-white/5 p-8 flex flex-col hidden lg:flex">
+      <aside className="fixed inset-y-0 left-0 w-80 bg-black/40 backdrop-blur-3xl border-r border-white/5 p-8 flex flex-col hidden lg:flex z-20">
         <div className="flex items-center gap-4 mb-12">
           <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
             <BarChart3 className="text-white w-8 h-8" />
@@ -231,18 +331,37 @@ export default function App() {
           </button>
         </nav>
 
-        <div className="mt-auto">
-          <div className="glass-card p-6 bg-indigo-500/5 mb-6">
-            <div className="flex items-center gap-3 mb-2">
-              <Sparkles className="w-4 h-4 text-indigo-400" />
-              <span className="text-xs font-bold text-indigo-300">FastAPI Powered</span>
+        <div className="mt-auto space-y-4">
+          <button 
+            onClick={() => setShowSettingsModal(true)}
+            className="w-full glass-card p-4 flex items-center justify-between hover:bg-white/10 transition-all text-left group"
+          >
+            <div className="flex items-center gap-3">
+              <Settings className="w-5 h-5 text-indigo-400 group-hover:rotate-45 transition-transform" />
+              <div>
+                <span className="text-xs font-bold text-white block">Integrations</span>
+                <span className="text-[10px] text-zinc-500">GitHub & Webhooks</span>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-zinc-500" />
+          </button>
+
+          <div className="glass-card p-6 bg-indigo-500/5">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Database className="w-4 h-4 text-indigo-400" />
+                <span className="text-xs font-bold text-indigo-300">Database Engine</span>
+              </div>
+              <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase ${dbInfo?.is_postgresql ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'}`}>
+                {dbInfo?.engine || 'SQLITE'}
+              </span>
             </div>
             <p className="text-[11px] text-indigo-300/60 leading-relaxed">
-              Python 3.13 backend handling semantic vector analysis.
+              {dbInfo?.is_postgresql ? 'Connected to PostgreSQL DB Server' : 'Running on local SQLite database'}
             </p>
           </div>
           
-          <div className="flex items-center justify-between px-2 pt-4 border-t border-white/5">
+          <div className="flex items-center justify-between px-2 pt-2 border-t border-white/5">
             <div className="flex items-center gap-3">
               <div className={`w-2.5 h-2.5 rounded-full ${backendStatus === 'online' ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-red-500'}`} />
               <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">
@@ -253,7 +372,108 @@ export default function App() {
         </div>
       </aside>
 
-      {/* Main */}
+      {/* Settings Modal */}
+      {showSettingsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-in fade-in duration-200">
+          <div className="bg-[#0f0f14] border border-white/10 rounded-3xl p-8 max-w-xl w-full shadow-2xl relative">
+            <button 
+              onClick={() => setShowSettingsModal(false)}
+              className="absolute top-6 right-6 p-2 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white transition-all"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-3 bg-indigo-500/10 rounded-2xl text-indigo-400">
+                <Settings className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-2xl font-black">Integrations & Settings</h3>
+                <p className="text-xs text-zinc-500">Configure GitHub API and Notification Webhook credentials</p>
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              {/* GitHub Config */}
+              <div className="glass-card p-6 bg-white/[0.02]">
+                <div className="flex items-center gap-2 mb-4">
+                  <Github className="w-5 h-5 text-indigo-400" />
+                  <h4 className="text-sm font-bold">GitHub REST Integration</h4>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1">GitHub Personal Access Token (PAT)</label>
+                    <input 
+                      type="password" 
+                      placeholder="ghp_xxxxxxxxxxxx" 
+                      className="w-full bg-[#16161e] border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500" 
+                      value={githubToken}
+                      onChange={(e) => setGithubToken(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1">Target Repository (owner/repo)</label>
+                    <input 
+                      type="text" 
+                      placeholder="octocat/Hello-World" 
+                      className="w-full bg-[#16161e] border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500" 
+                      value={githubRepo}
+                      onChange={(e) => setGithubRepo(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Webhooks Config */}
+              <div className="glass-card p-6 bg-white/[0.02]">
+                <div className="flex items-center gap-2 mb-4">
+                  <Bell className="w-5 h-5 text-purple-400" />
+                  <h4 className="text-sm font-bold">Notification Webhooks</h4>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1">Discord Webhook URL</label>
+                    <input 
+                      type="text" 
+                      placeholder="https://discord.com/api/webhooks/..." 
+                      className="w-full bg-[#16161e] border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500" 
+                      value={discordWebhook}
+                      onChange={(e) => setDiscordWebhook(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1">Slack Webhook URL</label>
+                    <input 
+                      type="text" 
+                      placeholder="https://hooks.slack.com/services/..." 
+                      className="w-full bg-[#16161e] border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500" 
+                      value={slackWebhook}
+                      onChange={(e) => setSlackWebhook(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-8">
+              <button 
+                onClick={() => setShowSettingsModal(false)}
+                className="px-6 py-3 rounded-2xl bg-white/5 hover:bg-white/10 font-bold text-sm transition-all"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={saveSettings}
+                className="btn-primary px-8 py-3 rounded-2xl font-bold text-sm"
+              >
+                Save Settings
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Main Content */}
       <main className="flex-1 lg:ml-80 p-6 lg:p-12 overflow-y-auto min-h-screen">
         <div className="max-w-7xl mx-auto">
           {activeTab === 'dashboard' && (
@@ -311,11 +531,11 @@ export default function App() {
 
                 <div className="glass-card p-8 flex flex-col justify-between">
                   <div className="flex justify-between items-start mb-4">
-                    <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">Analysis Time</p>
-                    <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400"><Zap className="w-4 h-4" /></div>
+                    <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">Engine Mode</p>
+                    <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400"><Database className="w-4 h-4" /></div>
                   </div>
-                  <p className="text-6xl font-black text-indigo-400 mb-4">0.8s</p>
-                  <p className="text-[10px] font-bold text-purple-400 uppercase tracking-widest flex items-center gap-2">Real-Time Pipeline</p>
+                  <p className="text-3xl font-black text-indigo-400 mb-4 uppercase">{dbInfo?.engine || 'SQLite'}</p>
+                  <p className="text-[10px] font-bold text-purple-400 uppercase tracking-widest flex items-center gap-2">DB Engine Active</p>
                 </div>
               </div>
 
@@ -396,11 +616,11 @@ export default function App() {
               <header className="flex flex-col md:flex-row md:items-center justify-between gap-8">
                 <div>
                   <h2 className="text-5xl font-extrabold tracking-tight">Issue <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-500">Registry</span></h2>
-                  <p className="text-zinc-500 mt-3 text-lg font-medium">Verified audit logs with AI-enhanced classification.</p>
+                  <p className="text-zinc-500 mt-3 text-lg font-medium">Verified audit logs with AI-enhanced classification & GitHub integration.</p>
                 </div>
                 <div className="relative w-full md:w-96">
                   <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-500" />
-                  <input type="text" placeholder="Scan registry..." className="bg-[#121216] border border-white/5 rounded-2xl pl-12 pr-6 py-4 w-full focus:outline-none focus:ring-1 focus:ring-indigo-500/30 transition-all text-sm font-medium" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                  <input type="text" placeholder="Scan registry..." className="bg-[#121216] border border-white/5 rounded-2xl pl-12 pr-6 py-4 w-full focus:outline-none focus:ring-1 focus:ring-indigo-500/30 transition-all text-sm font-medium text-white" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                 </div>
               </header>
 
@@ -408,11 +628,24 @@ export default function App() {
                 {filteredReports.map((report) => (
                   <div key={report.id} className="relative bg-[#0f0f13] border border-white/5 rounded-3xl p-6 group transition-all hover:bg-[#121216] hover:border-white/10 flex flex-col md:flex-row gap-6">
                     <div className="flex-1">
-                      <div className="flex items-center gap-4 mb-4">
+                      <div className="flex items-center gap-4 mb-4 flex-wrap">
                         <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border" style={{ borderColor: `${PRIORITY_COLORS[report.priority]}40`, backgroundColor: `${PRIORITY_COLORS[report.priority]}10`, color: PRIORITY_COLORS[report.priority] }}>{report.priority}</span>
                         <span className="text-xs font-bold text-zinc-400 bg-[#15151a] px-3 py-1 rounded-full flex items-center gap-2 border border-white/5">
                           {CATEGORY_ICONS[report.category]} {report.category}
                         </span>
+                        
+                        {/* GitHub badge if created */}
+                        {report.github_issue_url && (
+                          <a 
+                            href={report.github_issue_url} 
+                            target="_blank" 
+                            rel="noreferrer"
+                            className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full flex items-center gap-1.5 border border-emerald-500/20 hover:bg-emerald-500/20 transition-all"
+                          >
+                            <Github className="w-3.5 h-3.5" /> Issue Linked <ExternalLink className="w-3 h-3" />
+                          </a>
+                        )}
+
                         <div className="flex-1" />
                         <span className="text-[10px] font-bold text-zinc-600 tracking-widest">{new Date(report.timestamp).toLocaleTimeString('en-US', {hour12: false, hour: '2-digit', minute:'2-digit', second:'2-digit'})}</span>
                       </div>
@@ -423,10 +656,55 @@ export default function App() {
                           <p className="text-sm font-medium text-indigo-100/70 leading-relaxed">{report.solution}</p>
                         </div>
                       )}
-                      <div className="flex flex-wrap items-center gap-4 text-xs font-bold text-zinc-500">
+                      
+                      <div className="flex flex-wrap items-center gap-4 text-xs font-bold text-zinc-500 pt-2">
                         <span className="flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-md border border-white/5"><FileText className="w-3 h-3 text-indigo-500" /> {report.source_file}</span>
                         <span className="w-1 h-1 rounded-full bg-zinc-700" />
                         <span>ID: {report.id.toString().padStart(4, '0')}</span>
+
+                        {/* Integration Action Buttons */}
+                        <div className="flex items-center gap-2 ml-auto flex-wrap">
+                          {!report.github_issue_url && (
+                            <button
+                              disabled={actionLoading[`gh_${report.id}`]}
+                              onClick={() => createGithubIssue(report.id)}
+                              className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-bold flex items-center gap-2 border border-white/10 transition-all"
+                            >
+                              {actionLoading[`gh_${report.id}`] ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Github className="w-3.5 h-3.5 text-indigo-400" />
+                              )}
+                              Create Issue
+                            </button>
+                          )}
+
+                          <button
+                            disabled={actionLoading[`wh_${report.id}_discord`]}
+                            onClick={() => sendWebhookAlert(report.id, 'discord')}
+                            className="px-3 py-1.5 rounded-lg bg-indigo-950/60 hover:bg-indigo-900/60 text-indigo-200 text-xs font-bold flex items-center gap-1.5 border border-indigo-500/20 transition-all"
+                          >
+                            {actionLoading[`wh_${report.id}_discord`] ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Send className="w-3.5 h-3.5 text-indigo-400" />
+                            )}
+                            Discord Alert
+                          </button>
+
+                          <button
+                            disabled={actionLoading[`wh_${report.id}_slack`]}
+                            onClick={() => sendWebhookAlert(report.id, 'slack')}
+                            className="px-3 py-1.5 rounded-lg bg-purple-950/60 hover:bg-purple-900/60 text-purple-200 text-xs font-bold flex items-center gap-1.5 border border-purple-500/20 transition-all"
+                          >
+                            {actionLoading[`wh_${report.id}_slack`] ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Send className="w-3.5 h-3.5 text-purple-400" />
+                            )}
+                            Slack Alert
+                          </button>
+                        </div>
                       </div>
                     </div>
                     <div className="flex flex-col items-center justify-start gap-3 border-l border-white/5 pl-6">
@@ -434,7 +712,7 @@ export default function App() {
                         <button onClick={() => deleteReport(report.id)} className="w-10 h-10 flex items-center justify-center bg-white/5 hover:bg-red-500/20 hover:text-red-500 rounded-xl transition-all border border-white/5 text-zinc-500"><Trash2 className="w-4 h-4" /></button>
                         <button onClick={() => verifyReport(report.id)} className="w-10 h-10 flex items-center justify-center bg-white/5 hover:bg-indigo-500/20 hover:text-indigo-400 rounded-xl transition-all border border-white/5 text-zinc-500"><ChevronRight className="w-4 h-4" /></button>
                       </div>
-                      {report.verified && <span className="mt-auto absolute bottom-8 right-8 text-[9px] font-black tracking-[0.2em] text-indigo-500">VERIFIED</span>}
+                      {report.verified && <span className="mt-auto text-[9px] font-black tracking-[0.2em] text-indigo-500">VERIFIED</span>}
                     </div>
                   </div>
                 ))}
@@ -512,7 +790,7 @@ export default function App() {
             <div className="space-y-12 animate-in fade-in duration-700">
                <header>
                 <h2 className="text-5xl font-extrabold tracking-tight">System <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-500">Documentation</span></h2>
-                <p className="text-zinc-500 mt-3 text-lg font-medium">Access system guides and export audit data for external reporting.</p>
+                <p className="text-zinc-500 mt-3 text-lg font-medium font-medium">Access system guides and export audit data for external reporting.</p>
               </header>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="glass-card p-10">
@@ -570,7 +848,11 @@ export default function App() {
                     </li>
                     <li className="flex items-start gap-3">
                       <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-1.5" />
-                      <span>Monitor system health and trends via <b>Analytics</b>.</span>
+                      <span>Publish issues to <b>GitHub</b> or dispatch alerts to <b>Discord/Slack</b>.</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-1.5" />
+                      <span>Configure <b>PostgreSQL DB</b> credentials in <code>.env.local</code>.</span>
                     </li>
                   </ul>
                 </div>

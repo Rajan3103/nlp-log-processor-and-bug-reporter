@@ -24,8 +24,8 @@ from integrations import (
 )
 
 app = FastAPI(
-    title="Nexus Gemini Log Processor & Bug Identifier",
-    description="Live Streaming AI Log Processor, Interactive Gemini Debugger, Deduplication & Enterprise Bug Automation"
+    title="LogSentinel AI",
+    description="Automated Log Processor, Real-Time Observability & AI Incident Resolution Platform"
 )
 
 # Enable CORS for React frontend
@@ -96,7 +96,7 @@ class StreamLogInput(BaseModel):
 @app.get("/")
 async def root():
     return {
-        "system": "Nexus Gemini Log Processor & Bug Reporter",
+        "system": "LogSentinel AI",
         "status": "online",
         "engine": "Google Gemini 1.5 Flash",
         "has_gemini": engine.has_gemini
@@ -138,7 +138,7 @@ async def upload_file(file: UploadFile = File(...), engine_type: str = Form("aut
             os.remove(temp_path)
         
         return {
-            "message": "File processed successfully with Gemini AI",
+            "message": "File processed successfully with LogSentinel AI",
             "fileName": file.filename,
             "content": sanitized_content[:5000],
             "redactedSecretsCount": redacted_count,
@@ -248,10 +248,6 @@ async def stats():
 # Live Ingestion & WebSocket Streaming Endpoints
 @app.post("/api/logs/stream")
 async def ingest_log_line(input_data: StreamLogInput):
-    """
-    Ingests live logs from daemon forwarders, scrubs secrets, broadcasts over WebSocket,
-    and automatically triggers Gemini analysis if error or exception markers are present.
-    """
     sanitized_line, redacted_count = engine.preprocess_and_sanitize(input_data.log_line)
     
     payload = {
@@ -289,7 +285,7 @@ async def websocket_logs_endpoint(websocket: WebSocket):
     try:
         await websocket.send_json({
             "type": "CONNECTION_ESTABLISHED",
-            "message": "Connected to Nexus Gemini Live Stream Gateway",
+            "message": "Connected to LogSentinel AI Live Stream Gateway",
             "time": datetime.now().isoformat()
         })
         while True:
@@ -342,7 +338,7 @@ async def export_excel():
     return Response(
         content=output.getvalue(), 
         media_type="text/csv", 
-        headers={"Content-Disposition": 'attachment; filename="registry_export.csv"'}
+        headers={"Content-Disposition": 'attachment; filename="logsentinel_registry.csv"'}
     )
 
 if __name__ == "__main__":

@@ -202,7 +202,7 @@ Content:
         if not self.has_gemini:
             return "Gemini AI is offline. Please configure GEMINI_API_KEY in your .env.local file to use interactive debugging."
 
-        system_context = f"""You are Nexus AI, an expert software systems reliability engineer and debugger.
+        system_context = f"""You are LogSentinel AI, an expert software systems reliability engineer and automated debugger.
 You are helping the user debug a specific bug report in their application.
 
 BUG REPORT CONTEXT:

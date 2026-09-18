@@ -1,16 +1,16 @@
 ```
  ╔═════════════════════════════════════════════════════════════════════════════════════════╗
- ║  ┌──(nexus-nlp㉿root)-[~/bug-identifier]                                                 ║
- ║  └─$ ./launch_system.sh --mode POSTGRESQL --ai GEMINI-1.5 --version 3.0.0-PRO            ║
+ ║  ┌──(logsentinel㉿root)-[~/incident-ops]                                                ║
+ ║  └─$ ./launch_sentinel.sh --mode POSTGRESQL --ai GEMINI-1.5 --version 3.0.0-PRO         ║
  ║                                                                                         ║
- ║   ██████╗ ██╗   ██╗ ██████╗     ██╗██████╗ ███████╗███╗   ██╗████████╗██╗███████╗██╗███████╗██████╗ ║
- ║   ██╔══██╗██║   ██║██╔════╝     ██║██╔══██╗██╔════╝████╗  ██║╚══██╔══╝██║██╔════╝██║██╔════╝██╔══██╗║
- ║   ██████╔╝██║   ██║██║  ███╗    ██║██║  ██║█████╗  ██╔██╗ ██║   ██║   ██║█████╗  ██║█████╗  ██████╔╝║
- ║   ██╔══██╗██║   ██║██║   ██║    ██║██║  ██║██╔══╝  ██║╚██╗██║   ██║   ██║██╔══╝  ██║██╔══╝  ██╔══██╗║
- ║   ██████╔╝╚██████╔╝╚██████╔╝    ██║██████╔╝███████╗██║ ╚████║   ██║   ██║██║     ██║███████╗██║  ██║║
- ║   ╚═════╝  ╚═════╝  ╚═════╝     ╚═╝╚═════╝ ╚══════╝╚═╝  ╚═══╝   ╚═╝   ╚═╝╚═╝     ╚═╝╚══════╝╚═╝  ╚═╝║
+ ║   ██╗      ██████╗  ██████╗ ███████╗███████╗███╗   ██╗████████╗██╗███╗   ██╗███████╗██╗   ║
+ ║   ██║     ██╔═══██╗██╔════╝ ██╔════╝██╔════╝████╗  ██║╚══██╔══╝██║████╗  ██║██╔════╝██║   ║
+ ║   ██║     ██║   ██║██║  ███╗███████╗█████╗  ██╔██╗ ██║   ██║   ██║██╔██╗ ██║█████╗  ██║   ║
+ ║   ██║     ██║   ██║██║   ██║╚════██║██╔══╝  ██║╚██╗██║   ██║   ██║██║╚██╗██║██╔══╝  ██║   ║
+ ║   ███████╗╚██████╔╝╚██████╔╝███████║███████╗██║ ╚████║   ██║   ██║██║ ╚████║███████╗███████╗
+ ║   ╚══════╝ ╚═════╝  ╚═════╝ ╚══════╝╚══════╝╚═╝  ╚═══╝   ╚═╝   ╚═╝╚═╝  ╚═══╝╚══════╝╚══════╝
  ║                                                                                         ║
- ║   [SYSTEM INITIALIZED]: Google Gemini AI Vector Log Processor & Multi-Channel Platform  ║
+ ║   [SYSTEM INITIALIZED]: LogSentinel AI — Autonomous Log Observability & SRE Platform     ║
  ╚═════════════════════════════════════════════════════════════════════════════════════════╝
 ```
 
@@ -30,15 +30,15 @@
 ### 🖥️ `SYS_DIAGNOSTICS // SYSTEM STATUS`
 
 ```console
-[root@nexus-node-01 ~]# systemctl status nexus-pipeline.service
-● nexus-pipeline.service - AI Log Ingestion & Bug Automated Reporting Engine
-     Loaded: loaded (/etc/systemd/system/nexus-pipeline.service; enabled)
+[root@logsentinel-node-01 ~]# systemctl status logsentinel-pipeline.service
+● logsentinel-pipeline.service - LogSentinel AI Log Ingestion & Bug Automated Reporting Engine
+     Loaded: loaded (/etc/systemd/system/logsentinel-pipeline.service; enabled)
      Active: active (running) since Fri 2026-09-18 10:30:00 UTC; 5ms ago
    Main PID: 8000 (uvicorn-fastapi)
       Tasks: 16 (limit: 4915)
      Memory: 148.2M
         CPU: 135ms
-     CGroup: /system.slice/nexus-pipeline.service
+     CGroup: /system.slice/logsentinel-pipeline.service
              ├─ 8000 /usr/bin/python3 main.py --host 0.0.0.0 --port 8000
              └─ 5173 node /client/node_modules/.bin/vite --host
 
@@ -53,11 +53,11 @@
 ### ⚡ `CAPABILITIES // CORE MODULES`
 
 ```bash
-$ nexus-cli --list-modules
+$ logsentinel-cli --list-modules
 
   [MOD-01] 🧠 GOOGLE GEMINI 1.5 FLASH AI ENGINE
            └─ End-to-end vector log parser, root-cause analyzer, and automated remediation engine.
-           └─ Interactive Gemini Root-Cause Debugger: Real-time chat drawer for code patches & reproduction steps.
+           └─ Interactive LogSentinel Root-Cause Debugger: Real-time chat drawer for code patches & reproduction steps.
 
   [MOD-02] 📡 LIVE WEBSOCKET LOG STREAM TERMINAL
            └─ Real-time tailing terminal via WebSockets (/api/ws/logs) with pause/resume and live buffer scan.
@@ -102,14 +102,14 @@ nlp-log-processor-and-bug-reporter/
     ├── 📄 package.json      # Node dependencies
     ├── 📁 public/           # Static assets & icons
     └── 📁 src/
-        ├── 📄 App.tsx       # Cyberpunk Observability Dashboard, Terminal Streamer & Gemini Drawer
+        ├── 📄 App.tsx       # Cyberpunk Observability Dashboard, Terminal Streamer & LogSentinel Drawer
         ├── 📄 App.css       # Custom glassmorphism & mesh background styles
         └── 📄 index.css     # Tailwind CSS base system
 ```
 
 ---
 
-### 🚀 `QUICKSTART // RUNNING THE PIPELINE`
+### 🚀 `QUICKSTART // RUNNING LOGSENTINEL`
 
 #### 1️⃣ Clone & Configure Environment
 ```bash
@@ -208,13 +208,13 @@ POST   /api/upload                     --> Upload & analyze log files (.log, .tx
 POST   /api/logs/stream                --> Ingest live log stream line with auto-detect
 WS     /api/ws/logs                    --> WebSocket gateway for real-time terminal streaming
 
-# Registry & Interactive Gemini Debugger
+# Registry & Interactive LogSentinel Debugger
 GET    /api/reports                    --> Fetch filtered reports (search, category, priority, status)
 POST   /api/reports/bulk               --> Bulk save with automated semantic deduplication
 PATCH  /api/reports/{id}               --> Update status ('Open', 'Verified', 'Resolved')
 DELETE /api/reports/{id}               --> Remove specific bug report
 DELETE /api/reports                    --> Clear all bug reports
-POST   /api/reports/{id}/chat          --> In-context interactive Gemini root-cause debugging
+POST   /api/reports/{id}/chat          --> In-context interactive LogSentinel root-cause debugging
 
 # Multi-Channel Dispatches
 POST   /api/reports/{id}/github-issue  --> 1-Click publish to GitHub Issues
@@ -230,5 +230,5 @@ GET    /api/export/excel               --> Export full bug registry to CSV/Excel
 
 ```console
 Distributed under the MIT License. See LICENSE for details.
-Nexus Gemini Log Platform © 2026. Built with Python, FastAPI, React, PostgreSQL & Google Gemini.
+LogSentinel AI Platform © 2026. Built with Python, FastAPI, React, PostgreSQL & Google Gemini.
 ```

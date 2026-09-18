@@ -69,7 +69,7 @@ def create_github_issue(report, token=None, repo=None):
 {solution if solution else "No fix suggested."}
 
 ---
-*Reported automatically by **Nexus Gemini Log Processor**.*
+*Reported automatically by **LogSentinel AI**.*
 """
 
     labels = ["bug", f"priority:{priority.lower()}", f"category:{category.lower().replace(' ', '-')}"]
@@ -113,7 +113,7 @@ def send_discord_webhook(report, webhook_url=None):
             {"name": "Source File", "value": report.get("source_file", "Unknown"), "inline": True},
             {"name": "AI Recommended Solution", "value": report.get("solution", "N/A")[:1000]}
         ],
-        "footer": {"text": "Nexus Gemini Log Platform"}
+        "footer": {"text": "LogSentinel AI Platform"}
     }
 
     payload = {"embeds": [embed]}
@@ -185,7 +185,7 @@ def send_telegram_alert(report, bot_token=None, chat_id=None):
     solution = report.get("solution", "No fix available")
     source = report.get("source_file", "Unknown")
 
-    message = f"""🚨 *[NEXUS BUG ALERT]* 🚨
+    message = f"""🚨 *[LOGSENTINEL BUG ALERT]* 🚨
 *Priority:* `{priority}`
 *Category:* `{category}`
 *Source:* `{source}`

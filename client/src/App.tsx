@@ -169,7 +169,7 @@ export default function App() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<number | null>(null);
 
-  // Interactive Gemini Debug Chat Drawer State
+  // Interactive LogSentinel Debug Chat Drawer State
   const [debugReport, setDebugReport] = useState<BugReport | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
@@ -214,7 +214,7 @@ export default function App() {
                 setStreamLogs(prev => [...prev.slice(-300), data.data]);
               }
             } else if (data.type === 'NEW_BUG_DETECTED') {
-              showToast(`🚨 Gemini detected new issue: ${data.report?.category || 'Bug'}`);
+              showToast(`🚨 LogSentinel detected new issue: ${data.report?.category || 'Bug'}`);
               fetchReports();
               fetchStats();
             }
@@ -352,7 +352,7 @@ export default function App() {
           raw_content: data.content,
           redacted_secrets_count: data.redactedSecretsCount || 0
         })));
-        showToast(`Gemini analyzed ${data.reports.length} issues. (${data.redactedSecretsCount || 0} sensitive tokens scrubbed)`);
+        showToast(`LogSentinel analyzed ${data.reports.length} issues. (${data.redactedSecretsCount || 0} sensitive tokens scrubbed)`);
       } else {
         setSuccessDialog(true);
       }
@@ -401,7 +401,7 @@ export default function App() {
           ...r,
           raw_content: res.data.content
         })));
-        showToast(`Gemini scanned buffer: ${res.data.reports.length} issues captured!`);
+        showToast(`LogSentinel scanned buffer: ${res.data.reports.length} issues captured!`);
         fetchReports();
         fetchStats();
       } else {
@@ -414,13 +414,13 @@ export default function App() {
     }
   };
 
-  // Interactive Gemini Chat Handler
+  // Interactive LogSentinel Debug Chat Handler
   const openDebugDrawer = (report: BugReport) => {
     setDebugReport(report);
     setChatMessages([
       {
         role: 'assistant',
-        content: `👋 Hello! I am Nexus Gemini Assistant. I've analyzed **${report.category}** in \`${report.source_file}\`.\n\nAsk me for root cause analysis, reproduction steps, or a code patch fix!`
+        content: `👋 Hello! I am LogSentinel AI Assistant. I've analyzed **${report.category}** in \`${report.source_file}\`.\n\nAsk me for root cause analysis, reproduction steps, or a code patch fix!`
       }
     ]);
   };
@@ -575,8 +575,8 @@ export default function App() {
             <Sparkles className="text-white w-8 h-8" />
           </div>
           <div>
-            <h1 className="font-extrabold text-2xl tracking-tighter">Nexus <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">Gemini</span></h1>
-            <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-zinc-500">Vector Log Platform</p>
+            <h1 className="font-extrabold text-2xl tracking-tighter">LogSentinel <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">AI</span></h1>
+            <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-zinc-500">Autonomous SRE Platform</p>
           </div>
         </div>
 
@@ -635,7 +635,7 @@ export default function App() {
             <div className="flex items-center gap-3">
               <div className={`w-2.5 h-2.5 rounded-full ${backendStatus === 'online' ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-red-500'}`} />
               <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">
-                {backendStatus === 'online' ? 'Gemini Engine Online' : 'Engine Offline'}
+                {backendStatus === 'online' ? 'LogSentinel Online' : 'Engine Offline'}
               </span>
             </div>
           </div>
@@ -779,7 +779,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Interactive Gemini Debug Slide-out Drawer */}
+      {/* Interactive LogSentinel Debug Slide-out Drawer */}
       {debugReport && (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
           <div className="w-full max-w-2xl bg-[#0c0c14] border-l border-white/10 p-8 flex flex-col h-full shadow-2xl animate-in slide-in-from-right duration-300">
@@ -789,7 +789,7 @@ export default function App() {
                   <Sparkles className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-black">Gemini Root-Cause Debugger</h3>
+                  <h3 className="text-xl font-black">LogSentinel Root-Cause Debugger</h3>
                   <p className="text-xs text-zinc-400">Interactive troubleshooting for #{debugReport.id} ({debugReport.category})</p>
                 </div>
               </div>
@@ -852,7 +852,7 @@ export default function App() {
                   <div className="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center">
                     <Loader2 className="w-4 h-4 animate-spin" />
                   </div>
-                  <span>Gemini is analyzing traceback and generating resolution...</span>
+                  <span>LogSentinel AI is analyzing traceback and generating resolution...</span>
                 </div>
               )}
             </div>
@@ -861,7 +861,7 @@ export default function App() {
             <form onSubmit={(e) => { e.preventDefault(); sendChatMessage(); }} className="flex gap-2 pt-4 border-t border-white/10">
               <input
                 type="text"
-                placeholder="Ask Gemini anything about this error..."
+                placeholder="Ask LogSentinel AI anything about this error..."
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
                 className="flex-1 bg-[#161622] border border-white/10 rounded-2xl px-5 py-3.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 text-white"
@@ -888,7 +888,7 @@ export default function App() {
               <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
                 <div>
                   <h2 className="text-5xl font-extrabold tracking-tight">System <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">Intelligence</span></h2>
-                  <p className="text-zinc-400 mt-3 text-lg font-medium">Observability analytics, MTTR tracking, and Gemini semantic deduplication.</p>
+                  <p className="text-zinc-400 mt-3 text-lg font-medium">Observability analytics, MTTR tracking, and LogSentinel semantic deduplication.</p>
                 </div>
                 <div className="flex gap-4">
                   <button onClick={clearAll} className="px-6 py-3 rounded-2xl bg-white/5 hover:bg-white/10 text-zinc-400 font-bold transition-all flex items-center gap-2">
@@ -1026,13 +1026,13 @@ export default function App() {
             </div>
           )}
 
-          {/* TAB 2: ISSUE REGISTRY & GEMINI DEBUGGER */}
+          {/* TAB 2: ISSUE REGISTRY & LOGSENTINEL DEBUGGER */}
           {activeTab === 'reports' && (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
               <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div>
                   <h2 className="text-5xl font-extrabold tracking-tight">Issue <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-500">Registry</span></h2>
-                  <p className="text-zinc-400 mt-2 text-base font-medium">Gemini root-cause analysis, occurrences, interactive debug chat, and multi-channel dispatch.</p>
+                  <p className="text-zinc-400 mt-2 text-base font-medium">LogSentinel root-cause analysis, occurrences, interactive debug chat, and multi-channel dispatch.</p>
                 </div>
 
                 {/* Filter and Search Bar */}
@@ -1131,12 +1131,12 @@ export default function App() {
 
                         <h4 className="text-xl md:text-2xl font-bold mb-4 text-white/95 leading-snug max-w-4xl">{report.description}</h4>
                         
-                        {/* Gemini Solution Box */}
+                        {/* LogSentinel Solution Box */}
                         {report.solution && (
                           <div className="bg-indigo-500/5 border border-indigo-500/15 rounded-2xl p-4 mb-6 relative group/sol">
                             <div className="flex items-center justify-between mb-2">
                               <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest flex items-center gap-2">
-                                <Sparkles className="w-3 h-3 text-indigo-400"/> Gemini AI Recommended Fix
+                                <Sparkles className="w-3 h-3 text-indigo-400"/> LogSentinel AI Recommended Fix
                               </p>
                               <button
                                 onClick={() => copySolution(report.id, report.solution || '')}
@@ -1157,13 +1157,13 @@ export default function App() {
 
                           {/* Action Buttons */}
                           <div className="flex items-center gap-2 ml-auto flex-wrap">
-                            {/* Gemini Interactive Debug Button */}
+                            {/* LogSentinel Interactive Debug Button */}
                             <button
                               onClick={() => openDebugDrawer(report)}
                               className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 text-indigo-200 text-xs font-bold flex items-center gap-1.5 border border-indigo-500/30 transition-all shadow-md shadow-indigo-500/5"
                             >
                               <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-                              Gemini Debug
+                              Debug with AI
                             </button>
 
                             {/* GitHub Action */}
@@ -1273,7 +1273,7 @@ export default function App() {
                     className="btn-primary px-6 py-3 rounded-2xl font-bold text-xs flex items-center gap-2"
                   >
                     {isAnalyzingStream ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                    Scan Buffer with Gemini
+                    Scan Buffer with AI
                   </button>
                 </div>
               </header>
@@ -1285,7 +1285,7 @@ export default function App() {
                     <span className="w-3 h-3 rounded-full bg-red-500/80" />
                     <span className="w-3 h-3 rounded-full bg-amber-500/80" />
                     <span className="w-3 h-3 rounded-full bg-emerald-500/80" />
-                    <span className="ml-3 text-zinc-400 font-bold">nexus-stream-tailer.log</span>
+                    <span className="ml-3 text-zinc-400 font-bold">logsentinel-stream-tailer.log</span>
                   </div>
                   <span>Buffer: {streamLogs.length} events</span>
                 </div>
@@ -1354,7 +1354,7 @@ export default function App() {
                       <CheckCircle2 className="w-8 h-8 text-emerald-500" />
                     </div>
                     <h3 className="text-2xl font-black text-center mb-2">Logs Clean & Safe</h3>
-                    <p className="text-zinc-400 text-center mb-8 text-sm">Google Gemini analyzed the file and identified no critical failures. Log sanitized and registered.</p>
+                    <p className="text-zinc-400 text-center mb-8 text-sm">LogSentinel AI analyzed the file and identified no critical failures. Log sanitized and registered.</p>
                     <button onClick={() => setSuccessDialog(false)} className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-2xl transition-all">
                       Acknowledge
                     </button>
@@ -1372,7 +1372,7 @@ export default function App() {
               </div>
 
               <button disabled={!file || isUploading} onClick={handleUpload} className="btn-primary w-full max-w-md flex items-center justify-center gap-4 py-5 text-lg mx-auto font-bold rounded-2xl">
-                {isUploading ? <><Loader2 className="w-6 h-6 animate-spin" /> Gemini Processing...</> : <><Zap className="w-6 h-6" /> Run Gemini Vector Analysis</>}
+                {isUploading ? <><Loader2 className="w-6 h-6 animate-spin" /> LogSentinel Processing...</> : <><Zap className="w-6 h-6" /> Run LogSentinel Analysis</>}
               </button>
             </div>
           )}
@@ -1397,7 +1397,7 @@ export default function App() {
                     </div>
                   </div>
                   <p className="text-zinc-400 text-sm mb-8 leading-relaxed">
-                    Download the entire bug registry including occurrence counters, last seen timestamps, and Gemini AI recommended fix recommendations.
+                    Download the entire bug registry including occurrence counters, last seen timestamps, and LogSentinel AI recommended fix recommendations.
                   </p>
                   <button 
                     onClick={async () => {
@@ -1406,7 +1406,7 @@ export default function App() {
                         const url = window.URL.createObjectURL(new Blob([res.data]));
                         const link = document.createElement('a');
                         link.href = url;
-                        link.setAttribute('download', 'nexus_gemini_registry.csv');
+                        link.setAttribute('download', 'logsentinel_registry.csv');
                         document.body.appendChild(link);
                         link.click();
                         link.remove();

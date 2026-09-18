@@ -1,5 +1,6 @@
 fastapi
-uvicorn
+uvicorn[standard]
+websockets
 python-multipart
 google-generativeai
 pandas
@@ -9,7 +10,5 @@ python-dotenv
 sqlalchemy
 joblib
 numpy
-flask-cors 
-groq
 requests
 psycopg2-binary

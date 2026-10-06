@@ -99,7 +99,7 @@ async def root():
     return {
         "system": "LogSentinel AI",
         "status": "online",
-        "engine": "Google Gemini 1.5 Flash",
+        "engine": f"Google {engine.model_name}" if engine.has_gemini else "offline",
         "has_gemini": engine.has_gemini
     }
 
@@ -108,7 +108,7 @@ async def health():
     db_info = get_db_info()
     return {
         "status": "online", 
-        "engine": "Gemini 1.5 Flash" if engine.has_gemini else "offline",
+        "engine": engine.model_name if engine.has_gemini else "offline",
         "has_gemini": engine.has_gemini,
         "database": db_info["engine"],
         "is_postgresql": db_info["is_postgresql"]

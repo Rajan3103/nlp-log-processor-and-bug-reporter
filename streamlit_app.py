@@ -262,7 +262,7 @@ elif tab == "Registry":
 
 elif tab == "Processor":
     st.markdown("<div style='text-align: center; padding-top: 2rem;'>", unsafe_allow_html=True)
-    st.markdown("<span style='background: rgba(99, 102, 241, 0.1); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.2); padding: 4px 16px; border-radius: 99px; font-size: 12px; font-weight: 800;'>Available: Gemini 1.5 Flash</span>", unsafe_allow_html=True)
+    st.markdown(f"<span style='background: rgba(99, 102, 241, 0.1); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.2); padding: 4px 16px; border-radius: 99px; font-size: 12px; font-weight: 800;'>Engine: {engine.model_name}</span>", unsafe_allow_html=True)
     st.markdown("## Pipeline <span class='gradient-text'>Inbound</span>", unsafe_allow_html=True)
     st.markdown("<p style='color: #71717a; font-size: 1.25rem;'>Deploy a dataset into the Bug Identifier engine for deep architectural analysis.</p>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)

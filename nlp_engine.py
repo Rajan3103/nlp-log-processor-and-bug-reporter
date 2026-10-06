@@ -18,10 +18,20 @@ MODEL_PATH = "local_bug_classifier.joblib"
 class NLPEngine:
     def __init__(self):
         self.has_gemini = False
+        self.model = None
+        self.model_name = "gemini-3.8-flash"
+        self.candidate_models = [
+            "gemini-3.5-flash-lite",
+            "gemini-3.1-flash-lite",
+            "gemini-3.5-flash",
+            "gemini-3.7-flash",
+            "gemini-3.8-flash"
+        ]
+        self.model_name = self.candidate_models[0]
         if GEMINI_API_KEY:
             try:
                 genai.configure(api_key=GEMINI_API_KEY)
-                self.model = genai.GenerativeModel("gemini-1.5-flash-latest")
+                self.model = genai.GenerativeModel(self.model_name)
                 self.has_gemini = True
             except Exception as e:
                 print(f"[NLPEngine] Failed to configure Gemini API: {e}")
@@ -179,11 +189,36 @@ Content:
         
         return reports
 
-    def analyze_with_gemini(self, prompt):
+    def _generate_content_with_fallback(self, prompt, **kwargs):
         if not self.has_gemini:
             raise ValueError("Gemini API Key is not configured. Please add GEMINI_API_KEY to your .env.local file.")
+        
+        last_err = None
+        request_opts = kwargs.pop("request_options", {})
+        if "timeout" not in request_opts:
+            request_opts["timeout"] = 12
+
+        for candidate in self.candidate_models:
+            try:
+                candidate_model = genai.GenerativeModel(candidate)
+                response = candidate_model.generate_content(prompt, request_options=request_opts, **kwargs)
+                self.model = candidate_model
+                self.model_name = candidate
+                return response
+            except Exception as e:
+                last_err = e
+                print(f"[NLPEngine] Model {candidate} delay or quota limit ({e}). Fast failover to next candidate...")
+                continue
+        raise ValueError(f"Gemini Analysis failed: {str(last_err)}")
+
+    def analyze_with_gemini(self, prompt_or_content, file_name=None):
+        # If called with (content, file_name), route through self.analyze
+        if file_name is not None:
+            return self.analyze(prompt_or_content, file_name)
+            
+        prompt = prompt_or_content
         try:
-            response = self.model.generate_content(
+            response = self._generate_content_with_fallback(
                 prompt,
                 generation_config={"response_mime_type": "application/json"}
             )
@@ -228,7 +263,7 @@ Provide clear, actionable, technical advice. If the user asks for a fix, provide
 
             full_prompt += f"User: {user_message}\nAssistant:"
 
-            response = self.model.generate_content(full_prompt)
+            response = self._generate_content_with_fallback(full_prompt)
             return response.text.strip()
         except Exception as e:
             return f"Gemini Debug Error: {str(e)}"

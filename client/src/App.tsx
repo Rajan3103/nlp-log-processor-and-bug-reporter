@@ -58,7 +58,12 @@ import axios from 'axios';
 
 const getApiBaseUrl = () => {
   const envUrl = import.meta.env.VITE_API_BASE_URL;
-  if (!envUrl) return 'http://localhost:8000/api';
+  if (!envUrl) {
+    if (typeof window !== 'undefined' && window.location.hostname && window.location.hostname !== 'localhost') {
+      return `http://${window.location.hostname}:8000/api`;
+    }
+    return 'http://localhost:8000/api';
+  }
   const trimmed = envUrl.replace(/\/$/, '');
   return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
 };
@@ -362,7 +367,9 @@ export default function App() {
       setActiveTab('reports');
       setFile(null);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Upload failed');
+      const detail = err.response?.data?.detail || err.message || 'Upload failed. Ensure backend is running on port 8000.';
+      setError(detail);
+      showToast(`Upload error: ${detail}`);
     } finally {
       setIsUploading(false);
     }

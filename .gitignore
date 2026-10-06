@@ -14,3 +14,4 @@ __pycache__/
 local_bug_classifier.joblib
 logs.db
 uploads/
+scratch/

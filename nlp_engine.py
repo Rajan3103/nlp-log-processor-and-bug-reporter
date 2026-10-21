@@ -15,6 +15,20 @@ load_dotenv(".env.local")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 MODEL_PATH = "local_bug_classifier.joblib"
 
+def _looks_like_card(text):
+    """True if text is a 13-19 digit number with a card-style first digit and a valid Luhn checksum."""
+    digits = [int(c) for c in text if c.isdigit()]
+    if not 13 <= len(digits) <= 19 or not 2 <= digits[0] <= 6:
+        return False
+    total = 0
+    for i, d in enumerate(reversed(digits)):
+        if i % 2 == 1:
+            d *= 2
+            if d > 9:
+                d -= 9
+        total += d
+    return total % 10 == 0
+
 class NLPEngine:
     def __init__(self):
         self.has_gemini = False
@@ -83,8 +97,16 @@ class NLPEngine:
         # 6. Generic API keys / Secret / Token assignments (api_key=xyz, secret_key=xyz)
         content = count_sub(r'(?i)(api[_-]?key|secret[_-]?key|client[_-]?secret|password|passwd|auth[_-]?token)\s*[:=]\s*["\']?[a-zA-Z0-9_~\-\.]{8,}["\']?', r'\1=[REDACTED_SECRET]', content)
 
-        # 7. Credit Card Numbers (Luhn-like 13-19 digits)
-        content = count_sub(r'\b(?:\d[ -]*?){13,16}\b', '[REDACTED_PII]', content)
+        # 7. Credit Card Numbers: 13-19 digits that start like a real card (2-6)
+        #    and pass the Luhn checksum, so timestamps and IDs are left alone
+        def redact_card(match):
+            nonlocal redacted_count
+            if _looks_like_card(match.group(0)):
+                redacted_count += 1
+                return '[REDACTED_PII]'
+            return match.group(0)
+
+        content = re.sub(r'\b\d(?:[ -]?\d){12,18}\b', redact_card, content)
 
         # 8. IP Addresses (IPv4)
         content = re.sub(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b', '[IP]', content)

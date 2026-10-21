@@ -87,13 +87,25 @@ def get_connection():
     conn.row_factory = sqlite3.Row
     return conn, "sqlite"
 
-def generate_fingerprint(description, category, priority):
-    """Generates a deterministic hash for deduplicating repeated error signatures."""
+PRIORITY_RANK = {"Low": 1, "Medium": 2, "High": 3, "Critical": 4}
+
+def generate_fingerprint(description, category):
+    """Generates a deterministic hash for deduplicating repeated error signatures.
+    Priority is left out so the same error rated differently is still counted as one bug."""
     norm_desc = " ".join((description or "").lower().split()[:25])
     norm_cat = (category or "").lower().strip()
-    norm_pri = (priority or "").lower().strip()
-    raw = f"{norm_desc}|{norm_cat}|{norm_pri}"
+    raw = f"{norm_desc}|{norm_cat}"
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+def refresh_fingerprints(cursor, db_type):
+    """Recomputes stored fingerprints so rows saved with the old formula still match new ones."""
+    ph = "%s" if db_type == "postgresql" else "?"
+    cursor.execute("SELECT id, description, category, fingerprint FROM bug_reports")
+    for row in cursor.fetchall():
+        report_id, description, category, old_fp = row[0], row[1], row[2], row[3]
+        new_fp = generate_fingerprint(description, category)
+        if new_fp != old_fp:
+            cursor.execute(f"UPDATE bug_reports SET fingerprint = {ph} WHERE id = {ph}", (new_fp, report_id))
 
 def init_db():
     conn, db_type = get_connection()
@@ -177,7 +189,8 @@ def init_db():
         for col, col_type in column_defs.items():
             if col not in columns:
                 cursor.execute(f"ALTER TABLE bug_reports ADD COLUMN {col} {col_type}")
-    
+
+    refresh_fingerprints(cursor, db_type)
     conn.commit()
     conn.close()
 
@@ -185,34 +198,30 @@ def add_report(description, category, priority, source_file, raw_content, status
     conn, db_type = get_connection()
     cursor = conn.cursor()
     ph = "%s" if db_type == "postgresql" else "?"
-    fingerprint = generate_fingerprint(description, category, priority)
+    fingerprint = generate_fingerprint(description, category)
     
     if deduplicate:
         # Check if existing open/in-progress report matches fingerprint
-        check_query = f"SELECT id, occurrence_count FROM bug_reports WHERE fingerprint = {ph} AND status != 'Resolved' LIMIT 1"
+        check_query = f"SELECT id, priority FROM bug_reports WHERE fingerprint = {ph} AND status != 'Resolved' LIMIT 1"
         cursor.execute(check_query, (fingerprint,))
         row = cursor.fetchone()
         if row:
-            existing_id = row[0] if isinstance(row, tuple) else row['id']
-            # Update occurrence count and last_seen
-            if db_type == "postgresql":
-                update_query = f"""
-                    UPDATE bug_reports 
-                    SET occurrence_count = occurrence_count + 1, 
-                        last_seen = CURRENT_TIMESTAMP,
-                        redacted_secrets_count = redacted_secrets_count + {ph}
-                    WHERE id = {ph}
-                """
-                cursor.execute(update_query, (redacted_secrets_count, existing_id))
+            existing_id, existing_priority = row[0], row[1]
+            # Keep the more severe of the stored and the new priority
+            if PRIORITY_RANK.get(priority, 0) > PRIORITY_RANK.get(existing_priority, 0):
+                kept_priority = priority
             else:
-                update_query = f"""
-                    UPDATE bug_reports 
-                    SET occurrence_count = occurrence_count + 1, 
-                        last_seen = CURRENT_TIMESTAMP,
-                        redacted_secrets_count = redacted_secrets_count + {ph}
-                    WHERE id = {ph}
-                """
-                cursor.execute(update_query, (redacted_secrets_count, existing_id))
+                kept_priority = existing_priority
+            # Update occurrence count and last_seen
+            update_query = f"""
+                UPDATE bug_reports 
+                SET occurrence_count = occurrence_count + 1, 
+                    last_seen = CURRENT_TIMESTAMP,
+                    redacted_secrets_count = redacted_secrets_count + {ph},
+                    priority = {ph}
+                WHERE id = {ph}
+            """
+            cursor.execute(update_query, (redacted_secrets_count, kept_priority, existing_id))
             conn.commit()
             conn.close()
             return existing_id

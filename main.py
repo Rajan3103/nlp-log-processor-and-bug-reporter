@@ -1,11 +1,11 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, Form, WebSocket, WebSocketDisconnect, Query
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form, WebSocket, WebSocketDisconnect, Query, Header, Depends
 from fastapi.responses import Response, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 import os
-import shutil
+import secrets
 import csv
 import io
 import json
@@ -30,13 +30,26 @@ app = FastAPI(
 )
 
 # Enable CORS for React frontend
+# CORS_ORIGINS: comma-separated list of allowed sites (default "*" = any site).
+# Credentials are never sent cross-site; protected endpoints use the X-API-Key header instead.
+cors_origins = [o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=cors_origins,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Shared API key for destructive and alert-sending endpoints.
+# If LOGSENTINEL_API_KEY is not set, these endpoints stay open (local development).
+LOGSENTINEL_API_KEY = os.getenv("LOGSENTINEL_API_KEY", "")
+if not LOGSENTINEL_API_KEY:
+    print("[Security] LOGSENTINEL_API_KEY is not set: delete and alert endpoints are unprotected.")
+
+def require_api_key(x_api_key: Optional[str] = Header(None)):
+    if LOGSENTINEL_API_KEY and not secrets.compare_digest(x_api_key or "", LOGSENTINEL_API_KEY):
+        raise HTTPException(status_code=401, detail="Invalid or missing API key (X-API-Key header)")
 
 # Initialize Database & Gemini NLP Engine
 init_db()
@@ -96,6 +109,10 @@ class StreamLogInput(BaseModel):
 
 @app.get("/")
 async def root():
+    # Show the dashboard when the React UI has been built; otherwise a status message
+    index_file = os.path.join(os.path.dirname(__file__), "client", "dist", "index.html")
+    if os.path.exists(index_file):
+        return FileResponse(index_file)
     return {
         "system": "LogSentinel AI",
         "status": "online",
@@ -120,34 +137,26 @@ async def db_status():
 
 @app.post("/api/upload")
 async def upload_file(file: UploadFile = File(...), engine_type: str = Form("auto")):
-    temp_path = f"uploads/{file.filename}"
-    os.makedirs("uploads", exist_ok=True)
-    
-    with open(temp_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-    
+    # Keep only the bare file name (drops any "../" or folder parts sent by the client).
+    # The upload is processed in memory and never written to disk.
+    file_name = os.path.basename((file.filename or "").replace("\\", "/")) or "upload.log"
+
     try:
-        with open(temp_path, "rb") as f:
-            content_bytes = f.read()
-        
-        raw_text = engine.process_file_content(content_bytes, file.filename)
+        content_bytes = await file.read()
+
+        raw_text = engine.process_file_content(content_bytes, file_name)
         sanitized_content, redacted_count = engine.preprocess_and_sanitize(raw_text)
-        reports = engine.analyze(raw_text, file.filename, engine=engine_type)
-        
-        # Cleanup
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
-        
+        # Gemini calls block, so run them in a worker thread to keep the server responsive
+        reports = await asyncio.to_thread(engine.analyze, raw_text, file_name, engine=engine_type)
+
         return {
             "message": "File processed successfully with LogSentinel AI",
-            "fileName": file.filename,
+            "fileName": file_name,
             "content": sanitized_content[:5000],
             "redactedSecretsCount": redacted_count,
             "reports": reports
         }
     except Exception as e:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/reports")
@@ -176,14 +185,14 @@ async def chat_with_gemini_on_report(report_id: int, req: ChatDebugRequest):
     if not report:
         raise HTTPException(status_code=404, detail="Bug report not found")
     
-    response_text = engine.chat_debug(report, req.history or [], req.message)
+    response_text = await asyncio.to_thread(engine.chat_debug, report, req.history or [], req.message)
     return {
         "success": True,
         "reply": response_text,
         "timestamp": datetime.now().isoformat()
     }
 
-@app.post("/api/reports/{report_id}/github-issue")
+@app.post("/api/reports/{report_id}/github-issue", dependencies=[Depends(require_api_key)])
 async def publish_github_issue(report_id: int, request: GitHubIssueRequest):
     reports = get_reports()
     report = next((r for r in reports if r['id'] == report_id), None)
@@ -191,9 +200,10 @@ async def publish_github_issue(report_id: int, request: GitHubIssueRequest):
         raise HTTPException(status_code=404, detail="Report not found")
         
     try:
-        res = create_github_issue(
-            report=report, 
-            token=request.github_token, 
+        res = await asyncio.to_thread(
+            create_github_issue,
+            report=report,
+            token=request.github_token,
             repo=request.repo
         )
         issue_url = res["issue_url"]
@@ -206,7 +216,7 @@ async def publish_github_issue(report_id: int, request: GitHubIssueRequest):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.post("/api/reports/{report_id}/webhook")
+@app.post("/api/reports/{report_id}/webhook", dependencies=[Depends(require_api_key)])
 async def trigger_webhook(report_id: int, request: WebhookRequest):
     reports = get_reports()
     report = next((r for r in reports if r['id'] == report_id), None)
@@ -216,28 +226,28 @@ async def trigger_webhook(report_id: int, request: WebhookRequest):
     try:
         platform = (request.platform or "discord").lower()
         if platform == "slack":
-            res = send_slack_webhook(report, request.webhook_url)
+            res = await asyncio.to_thread(send_slack_webhook, report, request.webhook_url)
         elif platform == "telegram":
-            res = send_telegram_alert(report, request.telegram_bot_token, request.telegram_chat_id)
+            res = await asyncio.to_thread(send_telegram_alert, report, request.telegram_bot_token, request.telegram_chat_id)
         elif platform == "jira":
-            res = create_jira_issue(report, request.jira_url, request.jira_email, request.jira_token, request.jira_project)
+            res = await asyncio.to_thread(create_jira_issue, report, request.jira_url, request.jira_email, request.jira_token, request.jira_project)
             return {"success": True, "platform": "jira", "issue_url": res.get("issue_url")}
         elif platform == "linear":
-            res = create_linear_issue(report, request.linear_api_key, request.linear_team_id)
+            res = await asyncio.to_thread(create_linear_issue, report, request.linear_api_key, request.linear_team_id)
             return {"success": True, "platform": "linear", "issue_url": res.get("issue_url")}
         else:
-            res = send_discord_webhook(report, request.webhook_url)
+            res = await asyncio.to_thread(send_discord_webhook, report, request.webhook_url)
             
         return {"success": True, "platform": platform}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.delete("/api/reports/{report_id}")
+@app.delete("/api/reports/{report_id}", dependencies=[Depends(require_api_key)])
 async def remove_report(report_id: int):
     delete_report(report_id)
     return {"success": True}
 
-@app.delete("/api/reports")
+@app.delete("/api/reports", dependencies=[Depends(require_api_key)])
 async def remove_all_reports():
     clear_all_reports()
     return {"success": True}
@@ -266,7 +276,7 @@ async def ingest_log_line(input_data: StreamLogInput):
     error_patterns = ["error", "exception", "fatal", "traceback", "critical", "panic", "unhandled"]
     if input_data.auto_analyze and any(pat in input_data.log_line.lower() for pat in error_patterns):
         try:
-            reports = engine.analyze(input_data.log_line, input_data.source)
+            reports = await asyncio.to_thread(engine.analyze, input_data.log_line, input_data.source)
             if reports:
                 add_reports_bulk(reports, deduplicate=True)
                 analyzed_report = reports[0]

@@ -59,10 +59,9 @@ import axios from 'axios';
 const getApiBaseUrl = () => {
   const envUrl = import.meta.env.VITE_API_BASE_URL;
   if (!envUrl) {
-    if (typeof window !== 'undefined' && window.location.hostname && window.location.hostname !== 'localhost') {
-      return `http://${window.location.hostname}:8000/api`;
-    }
-    return 'http://localhost:8000/api';
+    // Same address the page was loaded from: FastAPI serves the built UI,
+    // and the Vite dev server proxies /api to the backend
+    return '/api';
   }
   const trimmed = envUrl.replace(/\/$/, '');
   return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
@@ -70,12 +69,52 @@ const getApiBaseUrl = () => {
 
 const getWsUrl = () => {
   const apiBase = getApiBaseUrl();
+  if (apiBase.startsWith('/')) {
+    const wsProto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    return `${wsProto}://${window.location.host}${apiBase}/ws/logs`;
+  }
   const wsProto = apiBase.startsWith('https') ? 'wss' : 'ws';
   const host = apiBase.replace(/^https?:\/\//, '').replace(/\/api$/, '');
   return `${wsProto}://${host}/api/ws/logs`;
 };
 
 const API_BASE = getApiBaseUrl();
+
+// Shared API key (LOGSENTINEL_API_KEY on the server) for delete and alert endpoints.
+// Asked for once when the server answers 401, then remembered in this browser.
+const API_KEY_STORAGE = 'logsentinel_api_key';
+
+const readApiKey = () => {
+  try {
+    return localStorage.getItem(API_KEY_STORAGE) || '';
+  } catch {
+    return '';
+  }
+};
+
+axios.interceptors.request.use((config) => {
+  const key = readApiKey();
+  if (key) config.headers.set('X-API-Key', key);
+  return config;
+});
+
+axios.interceptors.response.use(undefined, async (error) => {
+  const config = error.config;
+  if (error.response?.status === 401 && config && !config._apiKeyRetried) {
+    const key = window.prompt('This action needs the LogSentinel API key:');
+    if (key) {
+      try {
+        localStorage.setItem(API_KEY_STORAGE, key);
+      } catch {
+        // Storage unavailable: the key is still used for this retry
+      }
+      config._apiKeyRetried = true;
+      config.headers.set('X-API-Key', key);
+      return axios.request(config);
+    }
+  }
+  return Promise.reject(error);
+});
 
 interface BugReport {
   id: number;
